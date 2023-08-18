@@ -29,16 +29,16 @@ class Overzicht:
     def __init__(self, frame):
         # Create an oversight frame which is split up in silectframe (left) and dataframe (right)
         self.frame = frame
-        self.selectframe = customtkinter.CTkScrollableFrame(master=self.frame, bg_color="red")
-        self.selectframe.grid(row = 2, column = 0, sticky = "nswe", pady=0, padx=0)
-        self.dataframe = customtkinter.CTkScrollableFrame(master=self.frame, bg_color = "blue")
-        self.dataframe.grid(row = 2, column = 1, sticky = "nswe", pady=0, padx=0)
+        # self.selectframe = customtkinter.CTkScrollableFrame(master=self.frame, bg_color="red")
+        # self.selectframe.grid(row = 2, column = 0, sticky = "nswe", pady=0, padx=0)
+        # self.dataframe = customtkinter.CTkScrollableFrame(master=self.frame, bg_color = "blue")
+        # self.dataframe.grid(row = 2, column = 1, sticky = "nswe", pady=0, padx=0)
 
         # v1 = customtkinter.CTkScrollbar(self.selectframe, command=self.selectframe.yview)
         # v2 = customtkinter.CTkScrollbar(self.dataframeframe, command=self.dataframeframe.yview)
 
         #Create and load in the different years
-        self.loadyears()
+        # self.loadyears()
     
     def loadyears(self):
         # Create a list of years
