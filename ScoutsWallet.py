@@ -21,7 +21,7 @@ class MainMenu:
     def loadframe(self, frame):
         self.currentframe.pack_forget()
         self.currentframe = frame
-        self.currentframe.pack(pady=20, padx=60, fill="both", expand=True)
+        self.currentframe.pack(pady=0, padx=0, fill="both", expand=True)
 
     def mainmenuframe(self):
         def evenement():
