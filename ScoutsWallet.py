@@ -14,7 +14,8 @@ class MainMenu:
         self.root.geometry("500x350")
         self.mainmenuframe = self.mainmenuframe()
         self.currentframe = self.mainmenuframe
-        self.currentframe.pack()
+        self.currentframe.pack() 
+        self.groepskas = gk.GroepsKas(self.root, self)
 
         self.root.mainloop()
 
@@ -52,8 +53,8 @@ class MainMenu:
         return frame
 
     def clickmainmenu(self):
-        self.loadframe(gk.GroepsKas(self.root).getgroepskasframe())
-        
+        self.loadframe(self.groepskas.getgroepskasframe())
+    
         
 
 MainMenu()
