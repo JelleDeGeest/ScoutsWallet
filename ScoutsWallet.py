@@ -10,6 +10,8 @@ class MainMenu:
     def __init__(self):
         customtkinter.set_appearance_mode("dark")
         customtkinter.set_default_color_theme("scouts.json")
+        self.config = {}
+        self.loadconfig()
         self.root = customtkinter.CTk()
         self.root.geometry("500x350")
         self.mainmenuframe = self.mainmenuframe()
@@ -54,6 +56,14 @@ class MainMenu:
 
     def clickmainmenu(self):
         self.loadframe(self.groepskas.getgroepskasframe())
+    
+    def loadconfig(self):
+        
+        with open('config.txt', 'r') as f:
+            lines = f.readlines()
+            for line in lines:
+                key, value = line.strip().split(':')
+                self.config[key] = value.strip()
     
         
 

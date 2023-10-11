@@ -1,26 +1,36 @@
 import tkinter
 import customtkinter
 import csv
+import openpyxl
 import copy
+import os
+import pandas as pd
 
 class GroepsKas:
     def __init__(self, root, mainmenu):
         self.root = root
         self.mainmenu = mainmenu
+        self.current_path = os.getcwd()
+        self.tabladen = {}
+        self.loadfiles()
         self.frame = customtkinter.CTkFrame(master=self.root)
         self.groeps_frame = self.groepskasframe()
         self.addtransactions_frame = AddTransactions(self)
         self.groeps_frame.pack(pady=0, padx=0, fill="both", expand=True)
-        self.loadfiles()
-
-        # TODO place holder for the implementation of the tabladen and jaren
-        self.tabladen = ["BBQ","Brunch", "Inschrijvingen", "Brunchboxen"]
-        self.jaren = ["2019", "2020", "2021", "2022", "2023", "2024"]
-        self.huidig_jaar = 3
 
 
     def loadfiles(self):
-        self.lastchecked = "nooit"
+        self.lastchecked = self.mainmenu.config["laatste_transactie"]
+        self.huidig_jaar = self.mainmenu.config["huidig_jaar"]
+        self.years = [f.split()[1][:4] for f in os.listdir(os.path.join(self.current_path, "Files") ) if f.endswith('.xlsx') and not f.startswith('~')]
+        for jaar in self.years:
+            wb = openpyxl.load_workbook(os.path.join(self.current_path, "Files", "Groepskas " + jaar + ".xlsx"))
+            self.tabladen[jaar] = [f for f in wb.sheetnames if f != "Algemeen" and f != "Sjabloon"]
+        
+        print(self.current_path)
+        print(self.tabladen)
+        print(self.years)
+
     
     def groepskasframe(self):
         frame = customtkinter.CTkFrame(master=self.frame)
@@ -34,7 +44,7 @@ class GroepsKas:
         frame.rowconfigure(2, weight=1)
         frame.columnconfigure(0, weight=1)
 
-        self.overzicht_frame = Overzicht(frame)
+        self.overzicht_frame = Overzicht(frame, self)
         
         return frame
     
@@ -46,9 +56,10 @@ class GroepsKas:
         self.addtransactions_frame.getframe().pack(pady=0, padx=0, fill="both", expand=True)
 
 class Overzicht:
-    def __init__(self, frame):
+    def __init__(self, frame, groepskas):
         # Create an oversight frame which is split up in selectframe (left) and dataframe (right)
         self.frame = frame
+        self.groepskas = groepskas
         self.selectframe = customtkinter.CTkScrollableFrame(master=self.frame, bg_color="red")
         self.selectframe.grid(row = 2, column = 0, sticky = "nswe", pady=0, padx=0)
         self.dataframe = customtkinter .CTkScrollableFrame(master=self.frame, bg_color = "blue")
@@ -61,41 +72,41 @@ class Overzicht:
         self.loadyears()
     
     def loadyears(self):
-        # Create a list of years
-        self.years = []
-        for i in range(2019, 2025):
-            self.years.append(i)
         
         # Create a list of buttons for the years
         self.yearbuttons = []
         self.selectframe.columnconfigure(0, weight=1) 
-        for i in range(len(self.years)):
-            self.yearbuttons.append(customtkinter.CTkButton(master=self.selectframe, text=self.years[i], command= lambda i=i: self.clickyear(self.years[i])))
+        for i in range(len(self.groepskas.years)):
+            self.yearbuttons.append(customtkinter.CTkButton(master=self.selectframe, text=self.groepskas.years[i], command= lambda i=i: self.clickyear(self.groepskas.years[i])))
             self.yearbuttons[i].grid(row = i, column = 0, sticky = "nswe", pady=4, padx=2)
             # self.yearbuttons[i].bind("<Button-1>", self.clickyear)
 
     def clickyear(self, year):
-        # if a year is clicked we need to generate the data for that year
-        # we are now gonna generate some random data
-        data = []
-        for i in range (1, 10):
-            data.append(("test", i * 1000 * (-1) ** i))
+        # Fetch data from the excel file
+        wb = openpyxl.load_workbook(os.path.join(self.groepskas.current_path, "Files", "Groepskas " + year + ".xlsx"), data_only=True)
+        sheet = wb["Algemeen"]
         
-        # we need to clear the dataframe
+        # Read data from the excel file
+        data = []
+        for row in sheet.iter_rows(min_row=2, max_col=2, values_only=True):
+            if row[0] is not None and row[1] is not None:
+                data.append((row[0], round(row[1], 2))) 
+
+        # Clear the dataframe
         for widget in self.dataframe.winfo_children():
             widget.destroy()
 
-        # we need to create 2 labels for each transaction, 1 with the name and 1 with the amount, if the amount is negative it needs to be red otherwise green
+        # Create 2 labels for each transaction, 1 with the name and 1 with the amount, if the amount is negative it needs to be red otherwise green
         for i in range(len(data)):
             name = customtkinter.CTkLabel(master=self.dataframe, text=data[i][0])
-            name.grid(row = i, column = 0, sticky = "nsw", pady=4, padx=10)
+            name.grid(row=i, column=0, sticky="nsw", pady=4, padx=10)
             amount = customtkinter.CTkLabel(master=self.dataframe, text=data[i][1])
-            amount.grid(row = i, column = 1, sticky = "nswe", pady=4, padx=10)
+            amount.grid(row=i, column=1, sticky="nsw", pady=4, padx=10)
             if data[i][1] < 0:
                 amount.configure(text_color="red")
             else:
-                amount.configure(text_color="green")   
-        self.dataframe.columnconfigure(0, weight=1)
+                amount.configure(text_color="green")
+        # self.dataframe.columnconfigure(0, weight=1)
         
         
             
@@ -115,7 +126,45 @@ class AddTransactions:
         self.savebutton = customtkinter.CTkButton(master=self.add_frame, text="Opslaan", command=self.savedata)
 
     def savedata(self):
-        print(self.checksave())
+        if not self.checksave():
+            return
+        if not self.checkwritability():
+            #TODO Write error popup
+            return
+        arrays = [row for row in zip([row[0] for row in self.transactions[1:]], [row[1] for row in self.transactions[1:]], [row[2] for row in self.transactions[1:]], [t.cget("text") for t in self.names], [t.cget("text") for t in self.descriptions], [t.get() for t in self.jaar_option_vars], [t.get() for t in self.tablad_option_vars])]
+        df = pd.DataFrame(arrays, columns=["Datum", "Bedrag", "Saldo", "Naam", "Beschrijving", "Jaar", "Tablad"])
+        grouped_byyear = df.groupby("Jaar")
+        for year, group in grouped_byyear:
+            grouped_bytablad = group.groupby("Tablad")
+            file_path = self.groepskas.current_path + "/Files/Groepskas " + year + ".xlsx"
+            wb = openpyxl.load_workbook(file_path)
+            for tablad, tablad_group in grouped_bytablad:
+                sheet = wb[tablad]
+                first_empty_row = 1
+                while sheet.cell(first_empty_row, 1).value is not None or sheet.cell(first_empty_row, 2).value is not None:
+                    first_empty_row += 1
+                for i in range(len(tablad_group)):
+                    sheet.cell(row=first_empty_row + i, column=1).value = tablad_group['Naam'].iloc[i] + ": " + tablad_group['Beschrijving'].iloc[i]
+                    sheet.cell(row=first_empty_row + i, column=2).value = float(tablad_group['Bedrag'].iloc[i])
+                    sheet.cell(row=first_empty_row, column=2).number_format = '_-€ * #,##0.00_-;-€ * #,##0.00_-;_-€ * "-"??_-;_-@_-'
+            wb.save(file_path)
+
+    def checkwritability(self):
+        writable = True
+        for filename in os.listdir(self.groepskas.current_path + "/Files"):
+            if filename.endswith('.xlsx') and not filename.startswith('~'):
+                file_path = os.path.join(self.groepskas.current_path, "Files" , filename)
+                try:
+                    # Try to open the file in append mode.
+                    with open(file_path, 'a'):
+                        print(f"File is writable: {file_path}")
+                except PermissionError:
+                    print(f"Permission error: Can't write to {file_path}")
+                    writable = False
+                except FileNotFoundError:
+                    print(f"File not found: {file_path}")
+                    writable = False
+        return writable
 
     def getframe(self):
         return self.add_frame
@@ -129,14 +178,15 @@ class AddTransactions:
         self.displaytransactions()
         
     def changeyear(self, index):
-        print(index, self.jaar_option_vars[index].get())
+        self.tablad_comboboxes[index-1].configure(require_redraw=True, values=self.groepskas.tabladen[self.jaar_option_vars[index-1].get()])
+        self.tablad_option_vars[index-1].set("Selecteer een tablad")
 
     def changetablad(self, index):
-        print(index, self.tablad_option_vars[index].get())
+        print(index, self.tablad_option_vars[index-1].get())
 
     def checksave(self):
         ready = True
-        for i in range(len(self.transactions)):
+        for i in range(len(self.transactions)-1):
             self.entry_returned(0, i)
             self.entry_returned(1, i)
             if self.tablad_option_vars[i].get() == "Selecteer een tablad" or self.jaar_option_vars[i].get() == "Selecteer een jaar" or isinstance(self.names[i],customtkinter.CTkEntry) or isinstance(self.descriptions[i],customtkinter.CTkEntry):
@@ -159,6 +209,7 @@ class AddTransactions:
 
         self.tablad_option_vars = []
         self.jaar_option_vars = []
+        self.tablad_comboboxes = []
         self.names = []
         self.descriptions = []
 
@@ -218,17 +269,18 @@ class AddTransactions:
 
             # Create a combobox with all the years
             option_var = tkinter.StringVar()
-            option_var.set(self.groepskas.jaren[3])
+            option_var.set(self.groepskas.huidig_jaar)
             self.jaar_option_vars.append(option_var)       
-            jaar_menu = customtkinter.CTkOptionMenu(master=self.transactions_frame, variable=option_var, values=self.groepskas.jaren, command=lambda x, index=i: self.changeyear(index))
+            jaar_menu = customtkinter.CTkOptionMenu(master=self.transactions_frame, variable=option_var, values=self.groepskas.years, command=lambda x, index=i: self.changeyear(index))
             jaar_menu.grid(row = i, column = 4, sticky = "nswe", pady=4, padx=10)
 
             # Create a combobox with all the sheetnames
             option_var = tkinter.StringVar()
             option_var.set("Selecteer een tablad")
-            tablad_menu = customtkinter.CTkOptionMenu(master=self.transactions_frame, variable=option_var, values=self.groepskas.tabladen, command=lambda x, index=i: self.changetablad(index))
+            tablad_menu = customtkinter.CTkOptionMenu(master=self.transactions_frame, variable=option_var, values=self.groepskas.tabladen[self.groepskas.huidig_jaar], command=lambda x, index=i: self.changetablad(index))
             tablad_menu.grid(row = i, column = 5, sticky = "nswe", pady=4, padx=10)
             self.tablad_option_vars.append(option_var)
+            self.tablad_comboboxes.append(tablad_menu)
 
     def label_clicked(self, type, i):
         if type == 0:
@@ -236,11 +288,11 @@ class AddTransactions:
         elif type == 1:
             change_list = self.descriptions
 
-        change_list[i].grid_forget()
+        change_list[i-1].grid_forget()
         entry = customtkinter.CTkEntry(master=self.transactions_frame)
-        entry.insert(0, change_list[i].cget("text"))
-        change_list[i] = entry
-        change_list[i].grid(row = i, column = type + 2, sticky = "nswe", pady=4, padx=10)
+        entry.insert(0, change_list[i-1].cget("text"))
+        change_list[i-1] = entry
+        change_list[i-1].grid(row = i, column = type + 2, sticky = "nswe", pady=4, padx=10)
         entry.bind("<Return>", lambda event, type=type, i=i: self.entry_returned(type, i))
 
     def entry_returned(self, type, i):
@@ -252,8 +304,8 @@ class AddTransactions:
         if isinstance(change_list[i], customtkinter.CTkEntry) and change_list[i].get() != "":
             change_list[i].grid_forget()
             label = customtkinter.CTkLabel(master=self.transactions_frame, text=change_list[i].get())
-            label.grid(row = i, column = type + 2, sticky = "nswe", pady=4, padx=10)
-            label.bind("<Button-1>", lambda event, type=type, i=i: self.label_clicked(type, i))
+            label.grid(row = i+1, column = type + 2, sticky = "nswe", pady=4, padx=10)
+            label.bind("<Button-1>", lambda event, type=type, i=i: self.label_clicked(type, i+1))
             change_list[i] = label
         
 

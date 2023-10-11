@@ -1,0 +1,2 @@
+huidig_jaar: 2223
+laatste_transactie: NEVER
