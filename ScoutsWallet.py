@@ -62,8 +62,9 @@ class MainMenu:
         with open('config.txt', 'r') as f:
             lines = f.readlines()
             for line in lines:
-                key, value = line.strip().split(':')
+                key, value = line.strip().split('!')
                 self.config[key] = value.strip()
+        
     
         
 

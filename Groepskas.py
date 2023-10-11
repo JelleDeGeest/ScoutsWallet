@@ -15,14 +15,13 @@ class GroepsKas:
         self.loadfiles()
         self.frame = customtkinter.CTkFrame(master=self.root)
         self.groeps_frame = self.groepskasframe()
-        self.addtransactions_frame = AddTransactions(self)
         self.groeps_frame.pack(pady=0, padx=0, fill="both", expand=True)
 
 
     def loadfiles(self):
         self.lastchecked = self.mainmenu.config["laatste_transactie"]
         self.huidig_jaar = self.mainmenu.config["huidig_jaar"]
-        self.years = [f.split()[1][:4] for f in os.listdir(os.path.join(self.current_path, "Files") ) if f.endswith('.xlsx') and not f.startswith('~')]
+        self.years = [f.split()[1][:4] for f in os.listdir(os.path.join(self.current_path, "Files") ) if f.endswith('.xlsx') and f.startswith('Groepskas')]
         for jaar in self.years:
             wb = openpyxl.load_workbook(os.path.join(self.current_path, "Files", "Groepskas " + jaar + ".xlsx"))
             self.tabladen[jaar] = [f for f in wb.sheetnames if f != "Algemeen" and f != "Sjabloon"]
@@ -38,7 +37,10 @@ class GroepsKas:
         label.grid(row = 0, column = 0, columnspan = 2, pady=12, padx=10)
         
         addtransactionsbutton = customtkinter.CTkButton(master=frame, text="Voeg transacties toe", command=self.clickaddtransactions)
-        addtransactionsbutton.grid(row = 1, column = 0, columnspan = 2, sticky = "", pady=(0,24), padx=10,)
+        addtransactionsbutton.grid(row = 1, column = 1, columnspan = 1, sticky = "", pady=(0,24), padx=10,)
+
+        newyearbutton = customtkinter.CTkButton(master=frame, text="Nieuw jaar", command=self.clicknewyear)
+        newyearbutton.grid(row = 1, column = 0, sticky = "", pady=(0,24), padx=10,)
 
         frame.columnconfigure(1, weight=5)
         frame.rowconfigure(2, weight=1)
@@ -48,12 +50,46 @@ class GroepsKas:
         
         return frame
     
+    def clicknewyear(self):
+
+        #Create popup
+        dialog = customtkinter.CTkInputDialog(title="Nieuw jaar", text="Voer het nieuwe jaar in (Format: 2223 voor 2022 en 2023)")
+        result = dialog.get_input()
+        if len(result) != 4 or result in self.years:
+            return
+        #Get the previous year end balance to put it in the start of the new one
+        wb = openpyxl.load_workbook(os.path.join(self.current_path, "Files", "Groepskas " + self.years[-1] + ".xlsx"), data_only=True)
+        sheet = wb["Algemeen"]
+        previous_year_end_balance = wb["Algemeen"]['D14'].value
+        print(previous_year_end_balance)
+
+        #Open the template workbook and save it under the new name
+        wb = openpyxl.load_workbook(os.path.join(self.current_path, "template.xlsx"))
+        wb["Algemeen"]['B2'].value = previous_year_end_balance
+
+
+
+        wb.save(os.path.join(self.current_path, "Files", "Groepskas " + result + ".xlsx"))
+
+
+
+        self.loadfiles()
+        self.overzicht_frame.loadyears()
+
+
+
     def getgroepskasframe(self):
         return self.frame
 
     def clickaddtransactions(self):
+        self.addtransactions_frame = AddTransactions(self)
         self.groeps_frame.pack_forget()
         self.addtransactions_frame.getframe().pack(pady=0, padx=0, fill="both", expand=True)
+
+    def returntogroepskasframe(self):
+        self.addtransactions_frame.getframe().pack_forget()
+        self.groeps_frame.pack(pady=0, padx=0, fill="both", expand=True)
+        self.loadfiles()
 
 class Overzicht:
     def __init__(self, frame, groepskas):
@@ -75,7 +111,8 @@ class Overzicht:
         
         # Create a list of buttons for the years
         self.yearbuttons = []
-        self.selectframe.columnconfigure(0, weight=1) 
+        self.selectframe.columnconfigure(0, weight=1)
+        self.groepskas.years.sort(reverse=True)
         for i in range(len(self.groepskas.years)):
             self.yearbuttons.append(customtkinter.CTkButton(master=self.selectframe, text=self.groepskas.years[i], command= lambda i=i: self.clickyear(self.groepskas.years[i])))
             self.yearbuttons[i].grid(row = i, column = 0, sticky = "nswe", pady=4, padx=2)
@@ -126,11 +163,15 @@ class AddTransactions:
         self.savebutton = customtkinter.CTkButton(master=self.add_frame, text="Opslaan", command=self.savedata)
 
     def savedata(self):
+        #Check if all the data is filled in
         if not self.checksave():
             return
+        #Check if the files are writable
         if not self.checkwritability():
             #TODO Write error popup
             return
+        
+        #Save the data to the excel files
         arrays = [row for row in zip([row[0] for row in self.transactions[1:]], [row[1] for row in self.transactions[1:]], [row[2] for row in self.transactions[1:]], [t.cget("text") for t in self.names], [t.cget("text") for t in self.descriptions], [t.get() for t in self.jaar_option_vars], [t.get() for t in self.tablad_option_vars])]
         df = pd.DataFrame(arrays, columns=["Datum", "Bedrag", "Saldo", "Naam", "Beschrijving", "Jaar", "Tablad"])
         grouped_byyear = df.groupby("Jaar")
@@ -143,11 +184,43 @@ class AddTransactions:
                 first_empty_row = 1
                 while sheet.cell(first_empty_row, 1).value is not None or sheet.cell(first_empty_row, 2).value is not None:
                     first_empty_row += 1
-                for i in range(len(tablad_group)):
-                    sheet.cell(row=first_empty_row + i, column=1).value = tablad_group['Naam'].iloc[i] + ": " + tablad_group['Beschrijving'].iloc[i]
-                    sheet.cell(row=first_empty_row + i, column=2).value = float(tablad_group['Bedrag'].iloc[i])
+                lenght = len(tablad_group)
+                for i in range(lenght):
+                    sheet.cell(row=first_empty_row + i, column=1).value = tablad_group['Naam'].iloc[lenght-i-1] + ": " + tablad_group['Beschrijving'].iloc[lenght-i-1]
+                    sheet.cell(row=first_empty_row + i, column=2).value = float(tablad_group['Bedrag'].iloc[lenght-i-1])
                     sheet.cell(row=first_empty_row, column=2).number_format = '_-€ * #,##0.00_-;-€ * #,##0.00_-;_-€ * "-"??_-;_-@_-'
             wb.save(file_path)
+
+        #Save all transaction in transaction file to keep track of all transaction
+        file_path = self.groepskas.current_path + "/Files/Transacties.xlsx"
+        wb = openpyxl.load_workbook(file_path)
+        sheet = wb["Transactions"]
+        lenght = len(df)
+
+        first_empty_row = 1
+        while sheet.cell(first_empty_row, 1).value is not None:
+            first_empty_row += 1
+
+        for i in range(lenght):
+            sheet.cell(row=i+first_empty_row, column=1).value = df['Datum'].iloc[lenght-i-1]
+            sheet.cell(row=i+first_empty_row, column=2).value = float(df['Bedrag'].iloc[lenght-i-1])
+            sheet.cell(row=i+first_empty_row, column=3).value = df['Saldo'].iloc[lenght-i-1]
+            sheet.cell(row=i+first_empty_row, column=4).value = df['Naam'].iloc[lenght-i-1]
+            sheet.cell(row=i+first_empty_row, column=5).value = df['Beschrijving'].iloc[lenght-i-1]
+            sheet.cell(row=i+first_empty_row, column=6).value = int(df['Jaar'].iloc[lenght-i-1])
+            sheet.cell(row=i+first_empty_row, column=7).value = df['Tablad'].iloc[lenght-i-1]
+
+        wb.save(file_path)
+
+        #Change the lastchecked config
+        self.groepskas.mainmenu.config["laatste_transactie"] = str(self.transactions[1])
+
+        #Also change it in the config file
+        with open("Config.txt", "w") as file:
+            for key, value in self.groepskas.mainmenu.config.items():
+                file.write(key + "! " + value + "\n")
+
+        self.groepskas.returntogroepskasframe()
 
     def checkwritability(self):
         writable = True
@@ -164,6 +237,21 @@ class AddTransactions:
                 except FileNotFoundError:
                     print(f"File not found: {file_path}")
                     writable = False
+
+        #Check config file availability
+        file_path = os.path.join(self.groepskas.current_path, "Config.txt")
+        try:
+            with open(file_path, 'a'):
+                print(f"File is writable: Config.txt")
+        except PermissionError:
+            print(f"Permission error: Can't write to Config.txt")
+            writable = False
+        except FileNotFoundError:
+            print(f"File not found: Config.txt")
+            writable = False
+
+
+
         return writable
 
     def getframe(self):
@@ -319,6 +407,7 @@ class AddTransactions:
         with open(filelist, 'r') as file:
             csvreader = csv.reader(file)
             temp1 = self.groepskas.lastchecked.split(",")
+            print(temp1)
             for row in csvreader:
                 temp_transaction = ".".join(row).split(';')
                 transaction = [temp_transaction[5],temp_transaction[8],temp_transaction[9],temp_transaction[14].replace('                                                                       ', ""), temp_transaction[17].replace("                                                                                                                                            ", ""), "",""] 
