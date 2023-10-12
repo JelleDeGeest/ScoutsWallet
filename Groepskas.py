@@ -5,6 +5,7 @@ import openpyxl
 import copy
 import os
 import pandas as pd
+import win32com.client
 
 class GroepsKas:
     def __init__(self, root, mainmenu):
@@ -25,6 +26,7 @@ class GroepsKas:
         for jaar in self.years:
             wb = openpyxl.load_workbook(os.path.join(self.current_path, "Files", "Groepskas " + jaar + ".xlsx"))
             self.tabladen[jaar] = [f for f in wb.sheetnames if f != "Algemeen" and f != "Sjabloon"]
+        self.years.sort(reverse=True)
         
         print(self.current_path)
         print(self.tabladen)
@@ -52,30 +54,23 @@ class GroepsKas:
     
     def clicknewyear(self):
 
-        #Create popup
-        dialog = customtkinter.CTkInputDialog(title="Nieuw jaar", text="Voer het nieuwe jaar in (Format: 2223 voor 2022 en 2023)")
-        result = dialog.get_input()
-        if len(result) != 4 or result in self.years:
-            return
+        last_year = self.years[0]
+        new_year = str(last_year[len(last_year)//2:]) + str(int(last_year[len(last_year)//2:]) + 1)
+
         #Get the previous year end balance to put it in the start of the new one
-        wb = openpyxl.load_workbook(os.path.join(self.current_path, "Files", "Groepskas " + self.years[-1] + ".xlsx"), data_only=True)
-        sheet = wb["Algemeen"]
+        wb = openpyxl.load_workbook(os.path.join(self.current_path, "Files", "Groepskas " + last_year + ".xlsx"), data_only=True)
         previous_year_end_balance = wb["Algemeen"]['D14'].value
-        print(previous_year_end_balance)
 
         #Open the template workbook and save it under the new name
         wb = openpyxl.load_workbook(os.path.join(self.current_path, "template.xlsx"))
         wb["Algemeen"]['B2'].value = previous_year_end_balance
 
 
-
-        wb.save(os.path.join(self.current_path, "Files", "Groepskas " + result + ".xlsx"))
-
-
+        wb.save(os.path.join(self.current_path, "Files", "Groepskas " + new_year + ".xlsx"))
 
         self.loadfiles()
         self.overzicht_frame.loadyears()
-
+        self.mainmenu.evaluateworkbooks()
 
 
     def getgroepskasframe(self):
@@ -112,7 +107,6 @@ class Overzicht:
         # Create a list of buttons for the years
         self.yearbuttons = []
         self.selectframe.columnconfigure(0, weight=1)
-        self.groepskas.years.sort(reverse=True)
         for i in range(len(self.groepskas.years)):
             self.yearbuttons.append(customtkinter.CTkButton(master=self.selectframe, text=self.groepskas.years[i], command= lambda i=i: self.clickyear(self.groepskas.years[i])))
             self.yearbuttons[i].grid(row = i, column = 0, sticky = "nswe", pady=4, padx=2)
@@ -175,7 +169,9 @@ class AddTransactions:
         arrays = [row for row in zip([row[0] for row in self.transactions[1:]], [row[1] for row in self.transactions[1:]], [row[2] for row in self.transactions[1:]], [t.cget("text") for t in self.names], [t.cget("text") for t in self.descriptions], [t.get() for t in self.jaar_option_vars], [t.get() for t in self.tablad_option_vars])]
         df = pd.DataFrame(arrays, columns=["Datum", "Bedrag", "Saldo", "Naam", "Beschrijving", "Jaar", "Tablad"])
         grouped_byyear = df.groupby("Jaar")
+        changed_years = []
         for year, group in grouped_byyear:
+            changed_years.append(int(year))
             grouped_bytablad = group.groupby("Tablad")
             file_path = self.groepskas.current_path + "/Files/Groepskas " + year + ".xlsx"
             wb = openpyxl.load_workbook(file_path)
@@ -190,6 +186,31 @@ class AddTransactions:
                     sheet.cell(row=first_empty_row + i, column=2).value = float(tablad_group['Bedrag'].iloc[lenght-i-1])
                     sheet.cell(row=first_empty_row, column=2).number_format = '_-€ * #,##0.00_-;-€ * #,##0.00_-;_-€ * "-"??_-;_-@_-'
             wb.save(file_path)
+
+        #Make the starting budget up to date
+        self.groepskas.mainmenu.evaluateworkbooks()
+        temp_years = [int(year) for year in self.groepskas.years]
+        temp_years.sort()
+        print("-------------------")
+        print(temp_years)
+        print(changed_years)
+        for i,year in enumerate(temp_years):
+            excel = win32com.client.Dispatch("Excel.Application")
+            if year >= min(changed_years) and i > 0:
+                file_path = self.groepskas.current_path + "/Files/Groepskas " + str(temp_years[i-1]) + ".xlsx"
+                wb = openpyxl.load_workbook(file_path, data_only=True)
+                previous_total = wb["Algemeen"]["D14"].value
+                file_path = self.groepskas.current_path + "/Files/Groepskas " + str(year) + ".xlsx"
+                wb = openpyxl.load_workbook(file_path)
+                wb["Algemeen"]["B2"].value = previous_total
+                wb.save(file_path)
+                wb = excel.Workbooks.Open(file_path)
+                wb.Save()
+                wb.Close(True)  
+            excel.Quit()
+                
+        
+
 
         #Save all transaction in transaction file to keep track of all transaction
         file_path = self.groepskas.current_path + "/Files/Transacties.xlsx"

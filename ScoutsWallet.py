@@ -1,7 +1,8 @@
 import tkinter
 import customtkinter
 import Groepskas as gk
-
+import win32com.client
+import os
 
 
 class MainMenu:
@@ -20,6 +21,7 @@ class MainMenu:
         self.groepskas = gk.GroepsKas(self.root, self)
 
         self.root.mainloop()
+        self.evaluateworkbooks()
 
     def loadframe(self, frame):
         self.currentframe.pack_forget()
@@ -64,7 +66,16 @@ class MainMenu:
             for line in lines:
                 key, value = line.strip().split('!')
                 self.config[key] = value.strip()
-        
+    
+    def evaluateworkbooks(self):
+        excel = win32com.client.Dispatch("Excel.Application")
+        #Open and close all xlsx files in Files folder to evaluate formulas and save them
+        for filename in os.listdir(self.groepskas.current_path + "/Files"):
+            if filename.endswith(".xlsx"):
+                wb = excel.Workbooks.Open(self.groepskas.current_path + "/Files/" + filename)
+                wb.Save()
+                wb.Close(True)
+        excel.Quit()
     
         
 
