@@ -6,6 +6,8 @@ import copy
 import os
 import pandas as pd
 import win32com.client
+import TopLevelWindows as tlw
+import time
 
 class GroepsKas:
     def __init__(self, root, mainmenu):
@@ -17,7 +19,6 @@ class GroepsKas:
         self.frame = customtkinter.CTkFrame(master=self.root)
         self.groeps_frame = self.groepskasframe()
         self.groeps_frame.pack(pady=0, padx=0, fill="both", expand=True)
-
 
     def loadfiles(self):
         self.lastchecked = self.mainmenu.config["laatste_transactie"]
@@ -154,7 +155,12 @@ class AddTransactions:
 
         self.choosefilebutton = customtkinter.CTkButton(master=self.add_frame, text="Bestand kiezen", command=self.choosefileclicked)
         self.choosefilebutton.grid(row = 1, column = 0, columnspan = 2, sticky = "", pady=(0,24), padx=10,)
-        self.savebutton = customtkinter.CTkButton(master=self.add_frame, text="Opslaan", command=self.savedata)
+        self.buttonframe = customtkinter.CTkFrame(master=self.add_frame, fg_color="transparent")
+        self.savebutton = customtkinter.CTkButton(master=self.buttonframe, text="Opslaan", command=self.savedata) 
+        self.savebutton.grid(row = 0, column = 0, columnspan = 1, sticky = "", pady=(0,24), padx=10)
+        self.newtabbutton = customtkinter.CTkButton(master=self.buttonframe, text="Nieuw tablad", command=self.newtab)
+        self.newtabbutton.grid(row = 0, column = 1, columnspan = 1, sticky = "", pady=(0,24), padx=10)
+        
 
     def savedata(self):
         #Check if all the data is filled in
@@ -282,7 +288,8 @@ class AddTransactions:
     def choosefileclicked(self):
         self.choosefilebutton.grid_forget()
         self.transactions = self.gettransactions()
-        self.savebutton.grid(row = 1, column = 0, columnspan = 2, sticky = "", pady=(0,24), padx=10)
+        self.buttonframe.grid(row = 1, column = 0, columnspan = 2, sticky = "", pady=(8,8), padx=10)
+
 
         self.displaytransactions()
         
@@ -438,6 +445,11 @@ class AddTransactions:
                 else:
                     transactions.append(transaction)
             return transactions
+    
+    def newtab(self):
+        newtabwindow = tlw.NewTabWindow(self, master=self.groepskas.mainmenu.root, )
+        newtabwindow.after(100, newtabwindow.lift)
+
 
     
     
