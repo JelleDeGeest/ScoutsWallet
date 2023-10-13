@@ -8,6 +8,7 @@ import pandas as pd
 import win32com.client
 import TopLevelWindows as tlw
 import time
+from CTkMessagebox import CTkMessagebox
 
 class GroepsKas:
     def __init__(self, root, mainmenu):
@@ -153,24 +154,35 @@ class AddTransactions:
         self.add_frame.columnconfigure(0, weight=1)
         self.add_frame.rowconfigure(2, weight=1)
 
-        self.choosefilebutton = customtkinter.CTkButton(master=self.add_frame, text="Bestand kiezen", command=self.choosefileclicked)
-        self.choosefilebutton.grid(row = 1, column = 0, columnspan = 2, sticky = "", pady=(0,24), padx=10,)
+        self.choosefileframe = customtkinter.CTkFrame(master=self.add_frame, fg_color="transparent")
+        self.choosefileframe.grid(row = 1, column = 0, columnspan = 1, sticky = "", pady=(0,0), padx=10)
+        self.choosefilebutton = customtkinter.CTkButton(master=self.choosefileframe, text="Bestand kiezen", command=self.choosefileclicked)
+        self.choosefilebutton.grid(row = 0, column = 0, columnspan = 1, sticky = "", pady=(0,12), padx=10,)
+        self.backbutton2 = customtkinter.CTkButton(master=self.choosefileframe, text="Terug", command=self.groepskas.returntogroepskasframe)
+        self.backbutton2.grid(row = 0, column = 1, columnspan = 1, sticky = "", pady=(0,12), padx=10)
         self.buttonframe = customtkinter.CTkFrame(master=self.add_frame, fg_color="transparent")
-        self.savebutton = customtkinter.CTkButton(master=self.buttonframe, text="Opslaan", command=self.savedata) 
-        self.savebutton.grid(row = 0, column = 0, columnspan = 1, sticky = "", pady=(0,24), padx=10)
+        self.savebutton = customtkinter.CTkButton(master=self.buttonframe, text="Opslaan", command=self.save_data_preparation) 
+        self.savebutton.grid(row = 1, column = 0, columnspan = 2, sticky = "", pady=(0,12), padx=10)
         self.newtabbutton = customtkinter.CTkButton(master=self.buttonframe, text="Nieuw tablad", command=self.newtab)
-        self.newtabbutton.grid(row = 0, column = 1, columnspan = 1, sticky = "", pady=(0,24), padx=10)
-        
-
+        self.newtabbutton.grid(row = 0, column = 1, columnspan = 1, sticky = "", pady=(0,12), padx=10)
+        self.backbutton = customtkinter.CTkButton(master=self.buttonframe, text="Terug", command=self.groepskas.returntogroepskasframe)
+        self.backbutton.grid(row = 0, column = 0, columnspan = 1, sticky = "", pady=(0,12), padx=10)
+    
+    def save_data_preparation(self):   
+         waitwindow = tlw.WaitWindow(self, master=self.groepskas.mainmenu.root)
+        #  waitwindow.after(100, waitwindow.lift)
+    
     def savedata(self):
+        
         #Check if all the data is filled in
         if not self.checksave():
             return
         #Check if the files are writable
         if not self.checkwritability():
-            #TODO Write error popup
+            CTkMessagebox(title="Error", message="Geen permissie om bestanden aan te passen. Check of 1 van de excel bestanden of het config bestand nog ergens geopend zijn.", icon="cancel")
             return
         
+
         #Save the data to the excel files
         arrays = [row for row in zip([row[0] for row in self.transactions[1:]], [row[1] for row in self.transactions[1:]], [row[2] for row in self.transactions[1:]], [t.cget("text") for t in self.names], [t.cget("text") for t in self.descriptions], [t.get() for t in self.jaar_option_vars], [t.get() for t in self.tablad_option_vars])]
         df = pd.DataFrame(arrays, columns=["Datum", "Bedrag", "Saldo", "Naam", "Beschrijving", "Jaar", "Tablad"])
@@ -286,11 +298,13 @@ class AddTransactions:
     
     # Activates necessary functions when the choosefilebutton is clicked
     def choosefileclicked(self):
-        self.choosefilebutton.grid_forget()
         self.transactions = self.gettransactions()
+        # self.choosefilebutton.grid_forget()
+        if len(self.transactions) <= 1:
+            CTkMessagebox(title="Info", message="Er zijn geen nieuwe betalingen om te verwerken", option_1="OK")
+            return
+        
         self.buttonframe.grid(row = 1, column = 0, columnspan = 2, sticky = "", pady=(8,8), padx=10)
-
-
         self.displaytransactions()
         
     def changeyear(self, index):
@@ -447,7 +461,7 @@ class AddTransactions:
             return transactions
     
     def newtab(self):
-        newtabwindow = tlw.NewTabWindow(self, master=self.groepskas.mainmenu.root, )
+        newtabwindow = tlw.NewTabWindow(self, master=self.groepskas.mainmenu.root)
         newtabwindow.after(100, newtabwindow.lift)
 
 

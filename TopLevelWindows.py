@@ -2,6 +2,9 @@ import customtkinter
 import tkinter
 import openpyxl
 import os
+from openpyxl.styles import PatternFill, Font
+from openpyxl.formatting.rule import CellIsRule
+
 
 class NewTabWindow(customtkinter.CTkToplevel):
     def __init__(self, add_transactions, *args, **kwargs):
@@ -12,8 +15,8 @@ class NewTabWindow(customtkinter.CTkToplevel):
         self.setup_window()
 
         self.protocol("WM_DELETE_WINDOW", self.destroy)
-        self.master.withdraw()
         self.geometry(self.master.winfo_geometry())
+        self.master.withdraw()
 
 
     def destroy(self):
@@ -58,7 +61,7 @@ class NewTabWindow(customtkinter.CTkToplevel):
             return
         afkortingen = []
         file_path = os.path.join(self.add_transactions.groepskas.current_path, "Files", "Groepskas " + year + ".xlsx")
-        wb = openpyxl.load_workbook(file_path, data_only=True)
+        wb = openpyxl.load_workbook(file_path)
         if tablad in wb.sheetnames:
             #TODO: Show error message
             print("Tablad bestaat al")
@@ -82,16 +85,70 @@ class NewTabWindow(customtkinter.CTkToplevel):
         copied_sheet = wb.copy_worksheet(source_sheet)
         copied_sheet.title = tablad
         copied_sheet["E4"] = afkorting
+
+        # Create a CellIsRule for green fill and font
+        green_fill = PatternFill(start_color="c6efce", end_color="c6efce", fill_type="solid")
+        green_font = Font(color="006100")  # Black font
+        green_rule = CellIsRule(operator="greaterThan", formula=[0], fill=green_fill, font=green_font)
+
+        # Create a CellIsRule for red fill and font
+        red_fill = PatternFill(start_color="ffc7ce", end_color="ffc7ce", fill_type="solid")
+        red_font = Font(color="9C0006")  # Black font
+        red_rule = CellIsRule(operator="lessThan", formula=[0], fill=red_fill, font=red_font)
+
+
+        # Apply the rules to a range of cells
+        copied_sheet.conditional_formatting.add("B2:B1000", green_rule)
+        copied_sheet.conditional_formatting.add("B2:B1000", red_rule)
+    
+        #TODO add the added tab in the Algemeen tablad
+        sheet = wb["Algemeen"]
+        row = 1
+        while sheet["A" + str(row)].value != None:
+            row += 1
+        sheet["A" + str(row)].hyperlink = "#" + tablad + "!A1"
+        sheet["A" + str(row)].value = tablad
+        sheet["B" + str(row)].value = "='" + tablad +"'!E3"
+
         wb.save(file_path)
 
         #Change the variables in groepskas
-        #TODO not good cause doesnt save progress -> change this
         self.add_transactions.groepskas.loadfiles()
-        self.add_transactions.displaytransactions()
+        for i in range(len(self.add_transactions.tablad_comboboxes)):
+            if self.add_transactions.jaar_option_vars[i].get() == year:
+                self.add_transactions.tablad_comboboxes[i].configure(values=self.add_transactions.groepskas.tabladen[year])
 
-        #TODO fix geometry of root window to match new size
+        self.master.geometry(self.winfo_geometry())
         
 
-        #TODO add the added tab in the Algemeen tablad
+
         self.destroy()
     
+class WaitWindow(customtkinter.CTkToplevel):
+    def __init__(self, add_transactions, *args, **kwargs):
+        super().__init__(*args, **kwargs)
+        self.geometry("500x350")
+
+        self.setup_window()
+
+        self.protocol("WM_DELETE_WINDOW", self.destroy)
+        self.temp = self.master.winfo_geometry()
+        self.master.withdraw()
+        # self.update()
+        # self.update_idletasks()
+        self.after(1000,add_transactions.savedata())
+        self.finish() 
+
+
+
+    def destroy(self):
+        return
+    
+    def setup_window(self):
+        label = customtkinter.CTkLabel(master=self, text="Even geduld, dit kan even duren")
+        label.grid(row=0, column=0, sticky="", padx=24, pady=(16,0))
+
+    def finish(self):
+        super().destroy()
+        self.master.geometry(self.temp)
+        self.master.deiconify()
