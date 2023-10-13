@@ -1,5 +1,3 @@
-L = [3,4,5,22,33,44,55,66,77,88,99,100]
-L.sort(reverse=True)
-print(L)
-L.sort(reverse=True)
-print(L)
+string1 = "PAYCONIQ E610396D058FFF134AF04300 SCOUTS ST.-JOHANNES 787861B02822-4701-838A-C016E5539162 BBQ 2023 - 787861B0-2822-4701-838A-C016E553916"
+string2 = "Payconiq 327b4a6ee8cfcd721647aad9 Scouts St.-Johannes     0fb14fe71462-4855-b78b-9ccdcf693fdd BBQ 2023 - 0fb14fe7-1462-4855-b78b-9ccdcf693fd"
+print(len(string1.split(" ")), len(string2.split(" ")))

@@ -9,6 +9,7 @@ import win32com.client
 import TopLevelWindows as tlw
 import time
 from CTkMessagebox import CTkMessagebox
+from threading import Thread
 
 class GroepsKas:
     def __init__(self, root, mainmenu):
@@ -38,10 +39,17 @@ class GroepsKas:
     def groepskasframe(self):
         frame = customtkinter.CTkFrame(master=self.frame)
         label = customtkinter.CTkLabel(master=frame, text="Groepskas", font=("Arial", 30))
-        label.grid(row = 0, column = 0, columnspan = 2, pady=12, padx=10)
+        label.grid(row = 0, column = 0, columnspan = 2, pady=(12,24), padx=10)
+
+        buttonframe = customtkinter.CTkFrame(master=frame, fg_color="transparent")
+        buttonframe.grid(row = 1, column = 1, columnspan = 1, sticky = "", pady=(0,24), padx=10,)
         
-        addtransactionsbutton = customtkinter.CTkButton(master=frame, text="Voeg transacties toe", command=self.clickaddtransactions)
-        addtransactionsbutton.grid(row = 1, column = 1, columnspan = 1, sticky = "", pady=(0,24), padx=10,)
+        addtransactionsbutton = customtkinter.CTkButton(master=buttonframe, text="Voeg transacties toe", command=self.clickaddtransactions)
+        addtransactionsbutton.grid(row = 0, column = 0, columnspan = 1, sticky = "", pady=0, padx=12,)
+
+        returnbutton = customtkinter.CTkButton(master=buttonframe, text="Terug", command=self.mainmenu.returntomainmenu)
+        returnbutton.grid(row = 0, column = 1, columnspan = 1, sticky = "", pady=0, padx=12,)
+
 
         newyearbutton = customtkinter.CTkButton(master=frame, text="Nieuw jaar", command=self.clicknewyear)
         newyearbutton.grid(row = 1, column = 0, sticky = "", pady=(0,24), padx=10,)
@@ -168,11 +176,14 @@ class AddTransactions:
         self.backbutton = customtkinter.CTkButton(master=self.buttonframe, text="Terug", command=self.groepskas.returntogroepskasframe)
         self.backbutton.grid(row = 0, column = 0, columnspan = 1, sticky = "", pady=(0,12), padx=10)
     
-    def save_data_preparation(self):   
+    def save_data_preparation(self):
+         print(self.groepskas.root.winfo_geometry())   
          waitwindow = tlw.WaitWindow(self, master=self.groepskas.mainmenu.root)
-        #  waitwindow.after(100, waitwindow.lift)
+         waitwindow.after(100, waitwindow.lift)
+         t1 = Thread(target=self.savedata, args=(waitwindow,))
+         t1.start()
     
-    def savedata(self):
+    def savedata(self, waitwindow=None):
         
         #Check if all the data is filled in
         if not self.checksave():
@@ -260,6 +271,7 @@ class AddTransactions:
                 file.write(key + "! " + value + "\n")
 
         self.groepskas.returntogroepskasframe()
+        waitwindow.finish()
 
     def checkwritability(self):
         writable = True
@@ -356,8 +368,21 @@ class AddTransactions:
         jaar.grid(row = 0, column = 4, sticky = "nswe", pady=4, padx=10)
         tablad = customtkinter.CTkLabel(master=self.transactions_frame, text="Tablad")
         tablad.grid(row = 0, column = 5, sticky = "nswe", pady=4, padx=10)
-        
 
+        #Look up all the abreviations that are known
+        abreviations = {}
+        payconiq_abreviations = {}
+        file_path = os.path.join(self.groepskas.current_path, "Files", "Groepskas " + self.groepskas.huidig_jaar + ".xlsx")
+        wb = openpyxl.load_workbook(file_path, data_only=True)
+        for sheet_name in wb.sheetnames:
+            if sheet_name != "Algemeen" and sheet_name != "Sjabloon":
+                sheet = wb[sheet_name]
+                print(sheet["E4"].value)
+                if sheet['E4'].value is not None:
+                    abreviations[sheet['E4'].value.upper()] = sheet_name
+                if sheet['E5'].value is not None:
+                    payconiq_abreviations[sheet['E5'].value.upper()] = sheet_name
+                
         print(self.transactions)
         for i in range(1,len(self.transactions)):
 
@@ -385,6 +410,20 @@ class AddTransactions:
 
             self.names.append(name)
 
+            match = None
+            # Check if the discription contains a know abreveation
+            for abreviation in payconiq_abreviations.keys():
+                if abreviation in self.transactions[i][4].upper():
+                    match = payconiq_abreviations[abreviation]
+                    break
+
+            if match is None:
+                for abreviation in abreviations.keys():
+                    if abreviation in self.transactions[i][4].upper():
+                        match = abreviations[abreviation]
+                        break
+
+
             # Create a description editable label
             if self.transactions[i][4] != "":
                 description = customtkinter.CTkLabel(master=self.transactions_frame, text=self.transactions[i][4])
@@ -406,7 +445,10 @@ class AddTransactions:
 
             # Create a combobox with all the sheetnames
             option_var = tkinter.StringVar()
-            option_var.set("Selecteer een tablad")
+            if match is not None:
+                option_var.set(match)
+            else:
+                option_var.set("Selecteer een tablad")
             tablad_menu = customtkinter.CTkOptionMenu(master=self.transactions_frame, variable=option_var, values=self.groepskas.tabladen[self.groepskas.huidig_jaar], command=lambda x, index=i: self.changetablad(index))
             tablad_menu.grid(row = i, column = 5, sticky = "nswe", pady=4, padx=10)
             self.tablad_option_vars.append(option_var)

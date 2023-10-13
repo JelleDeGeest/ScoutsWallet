@@ -15,9 +15,9 @@ class MainMenu:
         self.loadconfig()
         self.root = customtkinter.CTk()
         self.root.geometry("500x350")
-        self.mainmenuframe = self.mainmenuframe()
+        self.mainmenuframe = self.get_mainmenuframe()
         self.currentframe = self.mainmenuframe
-        self.currentframe.pack() 
+        self.currentframe.pack(pady=0, padx=0, fill="both", expand=True) 
         self.groepskas = gk.GroepsKas(self.root, self)
 
         self.root.mainloop()
@@ -28,7 +28,7 @@ class MainMenu:
         self.currentframe = frame
         self.currentframe.pack(pady=0, padx=0, fill="both", expand=True)
 
-    def mainmenuframe(self):
+    def get_mainmenuframe(self):
         def evenement():
             print("Evenement")
 
@@ -67,6 +67,9 @@ class MainMenu:
                 key, value = line.strip().split('!')
                 self.config[key] = value.strip()
     
+    def returntomainmenu(self):
+        self.loadframe(self.mainmenuframe)
+
     def evaluateworkbooks(self):
         excel = win32com.client.Dispatch("Excel.Application")
         #Open and close all xlsx files in Files folder to evaluate formulas and save them

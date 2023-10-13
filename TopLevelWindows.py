@@ -4,6 +4,8 @@ import openpyxl
 import os
 from openpyxl.styles import PatternFill, Font
 from openpyxl.formatting.rule import CellIsRule
+from CTkMessagebox import CTkMessagebox
+
 
 
 class NewTabWindow(customtkinter.CTkToplevel):
@@ -15,13 +17,15 @@ class NewTabWindow(customtkinter.CTkToplevel):
         self.setup_window()
 
         self.protocol("WM_DELETE_WINDOW", self.destroy)
-        self.geometry(self.master.winfo_geometry())
+        self.temp=self.master.winfo_geometry()
+        self.geometry(self.temp)
         self.master.withdraw()
 
 
     def destroy(self):
         super().destroy()
         self.master.deiconify()
+        self.master.geometry(self.temp)
     
     def setup_window(self):
         label_year = customtkinter.CTkLabel(master=self, text="Kies in welk jaar je een tablad wilt toevoegen")
@@ -44,40 +48,43 @@ class NewTabWindow(customtkinter.CTkToplevel):
         label_afkorting2.grid(row=5, column=0, sticky="", padx=24, pady=(0,0))
         afkorting_entry.grid(row=6, column=0, sticky="", padx=24, pady=(4,0))
 
-        button = customtkinter.CTkButton(master=self, text="Toevoegen", command=lambda: self.add_tablad(year_option_var.get(), tablad_entry.get(), afkorting_entry.get()))
-        button.grid(row=7, column=0, sticky="", padx=24, pady=(16,0))
+        label_payconiq = customtkinter.CTkLabel(master=self, text="Naam van de payconiq webshop/inschrijvingen voor automatische verwerking:")
+        label_payconiq2 = customtkinter.CTkLabel(master=self, text="(Laat leeg als er geen is)")
+        payconiq_entry = customtkinter.CTkEntry(master=self, width=300)
+        label_payconiq.grid(row=7, column=0, sticky="", padx=24, pady=(16,0))
+        label_payconiq2.grid(row=8, column=0, sticky="", padx=24, pady=(0,0))
+        payconiq_entry.grid(row=9, column=0, sticky="", padx=24, pady=(4,0))
+        
+        button = customtkinter.CTkButton(master=self, text="Toevoegen", command=lambda: self.add_tablad(year_option_var.get(), tablad_entry.get(), afkorting_entry.get(), payconiq_entry.get()))
+        button.grid(row=10, column=0, sticky="", padx=24, pady=(16,0))
 
-    def add_tablad(self, year, tablad, afkorting):
+    def add_tablad(self, year, tablad, afkorting, payconiq):
         
         #Check if the filled in values are valid
         if tablad in self.add_transactions.groepskas.tabladen[year]:
-            #TODO: Show error message
-            print("Tablad bestaat al")
+            CTkMessagebox(title="Error", message="Tablad bestaat al!", icon="cancel")
             return
         
         if len(afkorting) != 3:
-            #TODO: Show error message
-            print("Afkorting moet 3 letters lang zijn")
+            CTkMessagebox(title="Error", message="Afkorting moet 3 letters lang zijn!", icon="cancel")
             return
+        
         afkortingen = []
         file_path = os.path.join(self.add_transactions.groepskas.current_path, "Files", "Groepskas " + year + ".xlsx")
         wb = openpyxl.load_workbook(file_path)
         if tablad in wb.sheetnames:
-            #TODO: Show error message
-            print("Tablad bestaat al")
+            CTkMessagebox(title="Error", message="Tablad bestaat al!", icon="cancel")
             return
         for sheet_name in wb.sheetnames:
             if sheet_name != "Algemeen" and sheet_name != "Sjabloon":
                 afkortingen.append(wb[sheet_name]["E4"].value)
         if afkorting in afkortingen:
-            #TODO: Show error message
-            print("Afkorting bestaat al")
+            CTkMessagebox(title="Error", message="Afkorting bestaat al!", icon="cancel")
             return
         
         #Check if file is available for editing
         if not os.access(file_path, os.W_OK):
-            #TODO: Show error message
-            print("File is niet beschikbaar voor bewerking")
+            CTkMessagebox(title="Error", message="Excel bestand is niet bewerkbaar zorg ervoor dat je het niet meer open hebt staan!", icon="cancel")
             return
 
         #Edit files
@@ -85,6 +92,7 @@ class NewTabWindow(customtkinter.CTkToplevel):
         copied_sheet = wb.copy_worksheet(source_sheet)
         copied_sheet.title = tablad
         copied_sheet["E4"] = afkorting
+        copied_sheet["E5"] = payconiq
 
         # Create a CellIsRule for green fill and font
         green_fill = PatternFill(start_color="c6efce", end_color="c6efce", fill_type="solid")
@@ -101,7 +109,7 @@ class NewTabWindow(customtkinter.CTkToplevel):
         copied_sheet.conditional_formatting.add("B2:B1000", green_rule)
         copied_sheet.conditional_formatting.add("B2:B1000", red_rule)
     
-        #TODO add the added tab in the Algemeen tablad
+        #Add the added tab in the Algemeen tablad
         sheet = wb["Algemeen"]
         row = 1
         while sheet["A" + str(row)].value != None:
@@ -118,37 +126,41 @@ class NewTabWindow(customtkinter.CTkToplevel):
             if self.add_transactions.jaar_option_vars[i].get() == year:
                 self.add_transactions.tablad_comboboxes[i].configure(values=self.add_transactions.groepskas.tabladen[year])
 
-        self.master.geometry(self.winfo_geometry())
-        
-
-
         self.destroy()
     
 class WaitWindow(customtkinter.CTkToplevel):
     def __init__(self, add_transactions, *args, **kwargs):
         super().__init__(*args, **kwargs)
-        self.geometry("500x350")
 
+        self.center_window()
         self.setup_window()
 
         self.protocol("WM_DELETE_WINDOW", self.destroy)
         self.temp = self.master.winfo_geometry()
         self.master.withdraw()
-        # self.update()
-        # self.update_idletasks()
-        self.after(1000,add_transactions.savedata())
-        self.finish() 
-
-
 
     def destroy(self):
         return
+
+    def center_window(self):
+        # Get screen width and height
+        screen_width = self.winfo_screenwidth()
+        screen_height = self.winfo_screenheight()
+
+        # Calculate position x and y coordinates
+        x = (screen_width // 2) - (500 // 2)
+        y = (screen_height // 2) - (350 // 2)
+        
+        self.geometry(f"{500}x{350}+{x}+{y}")
+
     
     def setup_window(self):
-        label = customtkinter.CTkLabel(master=self, text="Even geduld, dit kan even duren")
-        label.grid(row=0, column=0, sticky="", padx=24, pady=(16,0))
+        label = customtkinter.CTkLabel(master=self, text="Bestanden worden opgeslagen, even geduld dit kan even duren")
+        label.grid(row=0, column=0, sticky="", padx=24, pady=(0,0))
+        self.columnconfigure(0, weight=1)
+        self.rowconfigure(0, weight=1)
 
     def finish(self):
         super().destroy()
-        self.master.geometry(self.temp)
         self.master.deiconify()
+        self.master.geometry(self.temp)
