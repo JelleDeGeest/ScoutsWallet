@@ -70,7 +70,7 @@ class NewTabWindow(customtkinter.CTkToplevel):
             return
         
         afkortingen = []
-        file_path = os.path.join(self.add_transactions.groepskas.current_path, "Files", "Groepskas " + year + ".xlsx")
+        file_path = os.path.join(self.add_transactions.groepskas.current_path, "Groepskas", "Groepskas " + year + ".xlsx")
         wb = openpyxl.load_workbook(file_path)
         if tablad in wb.sheetnames:
             CTkMessagebox(title="Error", message="Tablad bestaat al!", icon="cancel")
@@ -118,6 +118,7 @@ class NewTabWindow(customtkinter.CTkToplevel):
         sheet["A" + str(row)].value = tablad
         sheet["B" + str(row)].value = "='" + tablad +"'!E3"
 
+        copied_sheet.protection.set_password('9170')
         wb.save(file_path)
 
         #Change the variables in groepskas

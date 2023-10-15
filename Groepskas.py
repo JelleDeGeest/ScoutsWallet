@@ -25,9 +25,9 @@ class GroepsKas:
     def loadfiles(self):
         self.lastchecked = self.mainmenu.config["laatste_transactie"]
         self.huidig_jaar = self.mainmenu.config["huidig_jaar"]
-        self.years = [f.split()[1][:4] for f in os.listdir(os.path.join(self.current_path, "Files") ) if f.endswith('.xlsx') and f.startswith('Groepskas')]
+        self.years = [f.split()[1][:4] for f in os.listdir(os.path.join(self.current_path, "Groepskas") ) if f.endswith('.xlsx') and f.startswith('Groepskas')]
         for jaar in self.years:
-            wb = openpyxl.load_workbook(os.path.join(self.current_path, "Files", "Groepskas " + jaar + ".xlsx"))
+            wb = openpyxl.load_workbook(os.path.join(self.current_path, "Groepskas", "Groepskas " + jaar + ".xlsx"))
             self.tabladen[jaar] = [f for f in wb.sheetnames if f != "Algemeen" and f != "Sjabloon"]
         self.years.sort(reverse=True)
         
@@ -68,7 +68,7 @@ class GroepsKas:
         new_year = str(last_year[len(last_year)//2:]) + str(int(last_year[len(last_year)//2:]) + 1)
 
         #Get the previous year end balance to put it in the start of the new one
-        wb = openpyxl.load_workbook(os.path.join(self.current_path, "Files", "Groepskas " + last_year + ".xlsx"), data_only=True)
+        wb = openpyxl.load_workbook(os.path.join(self.current_path, "Groepskas", "Groepskas " + last_year + ".xlsx"), data_only=True)
         previous_year_end_balance = wb["Algemeen"]['D14'].value
 
         #Open the template workbook and save it under the new name
@@ -76,7 +76,7 @@ class GroepsKas:
         wb["Algemeen"]['B2'].value = previous_year_end_balance
 
 
-        wb.save(os.path.join(self.current_path, "Files", "Groepskas " + new_year + ".xlsx"))
+        wb.save(os.path.join(self.current_path, "Groepskas", "Groepskas " + new_year + ".xlsx"))
 
         self.loadfiles()
         self.overzicht_frame.loadyears()
@@ -124,7 +124,7 @@ class Overzicht:
 
     def clickyear(self, year):
         # Fetch data from the excel file
-        wb = openpyxl.load_workbook(os.path.join(self.groepskas.current_path, "Files", "Groepskas " + year + ".xlsx"), data_only=True)
+        wb = openpyxl.load_workbook(os.path.join(self.groepskas.current_path, "Groepskas", "Groepskas " + year + ".xlsx"), data_only=True)
         sheet = wb["Algemeen"]
         
         # Read data from the excel file
@@ -177,22 +177,24 @@ class AddTransactions:
         self.backbutton.grid(row = 0, column = 0, columnspan = 1, sticky = "", pady=(0,12), padx=10)
     
     def save_data_preparation(self):
-         print(self.groepskas.root.winfo_geometry())   
-         waitwindow = tlw.WaitWindow(self, master=self.groepskas.mainmenu.root)
-         waitwindow.after(100, waitwindow.lift)
-         t1 = Thread(target=self.savedata, args=(waitwindow,))
-         t1.start()
-    
-    def savedata(self, waitwindow=None):
-        
+         if self.savedata_readycheck():
+            waitwindow = tlw.WaitWindow(self, master=self.groepskas.mainmenu.root)
+            waitwindow.after(100, waitwindow.lift)
+            t1 = Thread(target=self.savedata, args=(waitwindow,))
+            t1.start()
+
+    def savedata_readycheck(self):
         #Check if all the data is filled in
         if not self.checksave():
-            return
+            CTkMessagebox(title="Error", message="Eén of meerdere cellen/keuzboxes zijn niet ingevuld!", icon="cancel")
+            return False
         #Check if the files are writable
         if not self.checkwritability():
             CTkMessagebox(title="Error", message="Geen permissie om bestanden aan te passen. Check of 1 van de excel bestanden of het config bestand nog ergens geopend zijn.", icon="cancel")
-            return
+            return False
         
+        return True
+    def savedata(self, waitwindow=None):
 
         #Save the data to the excel files
         arrays = [row for row in zip([row[0] for row in self.transactions[1:]], [row[1] for row in self.transactions[1:]], [row[2] for row in self.transactions[1:]], [t.cget("text") for t in self.names], [t.cget("text") for t in self.descriptions], [t.get() for t in self.jaar_option_vars], [t.get() for t in self.tablad_option_vars])]
@@ -202,7 +204,7 @@ class AddTransactions:
         for year, group in grouped_byyear:
             changed_years.append(int(year))
             grouped_bytablad = group.groupby("Tablad")
-            file_path = self.groepskas.current_path + "/Files/Groepskas " + year + ".xlsx"
+            file_path = self.groepskas.current_path + "/Groepskas/Groepskas " + year + ".xlsx"
             wb = openpyxl.load_workbook(file_path)
             for tablad, tablad_group in grouped_bytablad:
                 sheet = wb[tablad]
@@ -226,10 +228,10 @@ class AddTransactions:
         for i,year in enumerate(temp_years):
             excel = win32com.client.Dispatch("Excel.Application")
             if year >= min(changed_years) and i > 0:
-                file_path = self.groepskas.current_path + "/Files/Groepskas " + str(temp_years[i-1]) + ".xlsx"
+                file_path = self.groepskas.current_path + "/Groepskas/Groepskas " + str(temp_years[i-1]) + ".xlsx"
                 wb = openpyxl.load_workbook(file_path, data_only=True)
                 previous_total = wb["Algemeen"]["D14"].value
-                file_path = self.groepskas.current_path + "/Files/Groepskas " + str(year) + ".xlsx"
+                file_path = self.groepskas.current_path + "/Groepskas/Groepskas " + str(year) + ".xlsx"
                 wb = openpyxl.load_workbook(file_path)
                 wb["Algemeen"]["B2"].value = previous_total
                 wb.save(file_path)
@@ -242,7 +244,7 @@ class AddTransactions:
 
 
         #Save all transaction in transaction file to keep track of all transaction
-        file_path = self.groepskas.current_path + "/Files/Transacties.xlsx"
+        file_path = self.groepskas.current_path + "/Groepskas/Algemeen.xlsx"
         wb = openpyxl.load_workbook(file_path)
         sheet = wb["Transactions"]
         lenght = len(df)
@@ -275,9 +277,9 @@ class AddTransactions:
 
     def checkwritability(self):
         writable = True
-        for filename in os.listdir(self.groepskas.current_path + "/Files"):
+        for filename in os.listdir(self.groepskas.current_path + "/Groepskas"):
             if filename.endswith('.xlsx') and not filename.startswith('~'):
-                file_path = os.path.join(self.groepskas.current_path, "Files" , filename)
+                file_path = os.path.join(self.groepskas.current_path, "Groepskas" , filename)
                 try:
                     # Try to open the file in append mode.
                     with open(file_path, 'a'):
@@ -372,7 +374,7 @@ class AddTransactions:
         #Look up all the abreviations that are known
         abreviations = {}
         payconiq_abreviations = {}
-        file_path = os.path.join(self.groepskas.current_path, "Files", "Groepskas " + self.groepskas.huidig_jaar + ".xlsx")
+        file_path = os.path.join(self.groepskas.current_path, "Groepskas", "Groepskas " + self.groepskas.huidig_jaar + ".xlsx")
         wb = openpyxl.load_workbook(file_path, data_only=True)
         for sheet_name in wb.sheetnames:
             if sheet_name != "Algemeen" and sheet_name != "Sjabloon":
